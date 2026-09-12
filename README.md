@@ -14,8 +14,9 @@ proven fixed. The demo never controls your computer.
 
 The next increment adds live-verified unit stopping, owned-object names and kinds,
 current orders/destinations, economy/production observations, and before/after
-progress reports. 63 automated tests pass. Camera centering is still experimental
-and **not yet verified**; ordinary pointer interaction while paused remains a
+progress reports. 71 automated tests pass. J camera centering is now live-verified
+from a displaced view, with optional `--move ... --recenter`; ordinary pointer
+interaction while paused remains a
 limitation. Combat, production execution, and general mission planning are pending.
 
 ## Why

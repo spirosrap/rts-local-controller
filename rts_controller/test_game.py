@@ -33,6 +33,10 @@ class TestGame:
     def focused(self):
         if not self.valid(): return False
         try:
+            # activewindow can still name the game behind a session lock.
+            # Use the compositor's lock blocker, not logind's stale LockedHint.
+            monitors = json.loads(subprocess.check_output(["hyprctl", "monitors", "-j"], timeout=.5))
+            if not desktop_unlocked(monitors): return False
             w = json.loads(subprocess.check_output(["hyprctl", "activewindow", "-j"], timeout=.5))
             return w.get("pid") == self.pid and w.get("title") == "Red Alert 2"
         except (OSError, ValueError, subprocess.SubprocessError): return False
@@ -60,6 +64,20 @@ class TestGame:
                     all(abs(a-b) <= 2 for a, b in zip(window["size"], size)))
         except (OSError, ValueError, KeyError, StopIteration, subprocess.SubprocessError):
             return False
+
+
+def desktop_unlocked(monitors):
+    """Fail closed on locks or unavailable Hyprland blocker information."""
+    if not isinstance(monitors, list) or not monitors: return False
+    readable = False
+    for monitor in monitors:
+        if not isinstance(monitor, dict): return False
+        blockers = monitor.get("solitaryBlockedBy")
+        if not isinstance(blockers, list) or not all(isinstance(v, str) for v in blockers):
+            return False
+        if "LOCK" in blockers: return False
+        if "WORKSPACE" not in blockers: readable = True
+    return readable
 
 
 def require_private_network():

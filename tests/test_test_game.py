@@ -1,11 +1,30 @@
 import json
 import unittest
 from unittest.mock import patch
-from rts_controller.test_game import TestGame, require_private_network
+from rts_controller.test_game import TestGame, require_private_network, desktop_unlocked
 from rts_controller.ra2 import BridgeError
 
 
 class GuardTests(unittest.TestCase):
+    def test_lock_on_any_monitor_blocks(self):
+        self.assertFalse(desktop_unlocked([{"solitaryBlockedBy": []}, {"solitaryBlockedBy": ["LOCK"]}]))
+
+    def test_unknown_lock_state_blocks(self):
+        for monitors in (None, [], [{}], [None], [{"solitaryBlockedBy": "LOCK"}],
+                         [{"solitaryBlockedBy": ["WORKSPACE"]}]):
+            with self.subTest(monitors=monitors):
+                self.assertFalse(desktop_unlocked(monitors))
+
+    def test_readable_unlocked_monitor(self):
+        self.assertTrue(desktop_unlocked([{"solitaryBlockedBy": ["WINDOW"]}]))
+
+    def test_lock_overrides_stale_game_focus(self):
+        game = object.__new__(TestGame); game.pid = 42
+        with patch.object(game, "valid", return_value=True), patch("subprocess.check_output",
+                return_value=b'[{"solitaryBlockedBy":["LOCK"]}]') as query:
+            self.assertFalse(game.focused())
+            self.assertEqual(query.call_count, 1)
+
     def test_external_interfaces_rejected(self):
         with patch("subprocess.check_output", return_value=b'[{"ifname":"lo"},{"ifname":"eth0"}]'):
             with self.assertRaises(BridgeError): require_private_network()

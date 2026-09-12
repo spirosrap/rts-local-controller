@@ -47,6 +47,7 @@ def main():
     action.add_argument("--stop-actor", action="store_true", help="Stop and verify an owned unit")
     action.add_argument("--move", nargs=2, type=int, metavar=("WORLD_X", "WORLD_Y"))
     paused.add_argument("--actor")
+    paused.add_argument("--recenter", action="store_true", help="After verified --move arrival, center selected units (4 extra frames)")
     observe = commands.add_parser("observe-ra2", help="Read local ra2yrcpp; never send game orders")
     observe.add_argument("--port", type=int, default=14521)
     observe.add_argument("--samples", type=int, default=1)
@@ -61,6 +62,8 @@ def main():
     cap.add_argument("--output", required=True)
     cap.add_argument("--destination", type=Path, default=Path("runtime/frame.png"))
     args = parser.parse_args()
+    if args.command == "paused-ra2" and args.recenter and args.move is None:
+        parser.error("--recenter requires --move")
     if args.command == "demo": demo()
     elif args.command in {"stop", "clear-stop"}:
         if args.command == "stop":
@@ -92,8 +95,13 @@ def main():
                 print(json.dumps(stop_actor(session, game, args.actor)), flush=True)
             elif args.move is not None:
                 if args.actor is None: raise ValueError("Movement requires --actor")
-                print(json.dumps(move(session, game, args.actor, tuple(args.move),
-                      report=lambda e: print(json.dumps(e), flush=True))), flush=True)
+                report = lambda e: print(json.dumps(e), flush=True)
+                if args.recenter:
+                    from .camera import move_and_center
+                    outcome = move_and_center(session, game, args.actor, tuple(args.move), args.output, report=report)
+                else:
+                    outcome = move(session, game, args.actor, tuple(args.move), report=report)
+                print(json.dumps(outcome), flush=True)
             elif args.frames is not None:
                 session.advance(args.frames, guard=game.focused)
             if not game.focused(): raise BridgeError("Focus changed before capture")

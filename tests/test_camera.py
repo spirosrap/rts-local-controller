@@ -2,8 +2,8 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
-from rts_controller.camera import center, center_key, send_key
+from unittest.mock import Mock, patch
+from rts_controller.camera import center, center_key, send_key, move_and_center
 from rts_controller.ra2 import BridgeError
 
 
@@ -59,3 +59,33 @@ class CameraTests(unittest.TestCase):
 
     def test_no_arbitrary_keys(self):
         with self.assertRaises(ValueError): send_key('f', 'down')
+
+    def test_boundary_noop_is_not_reported_as_failure(self):
+        result = center(self.session, self.game, 'DP-1', key_sender=Mock())
+        self.assertIn('map boundary', result['boundary_note'])
+        self.assertEqual(result['status'], 'camera_key_sent')
+
+    def test_recenter_after_arrival(self):
+        with patch('rts_controller.paused_move.move', return_value={'status':'arrived'}) as move, \
+             patch('rts_controller.camera.center', return_value={'status':'camera_key_sent'}) as camera:
+            result = move_and_center(self.session, self.game, '81', (100, 200), 'DP-1')
+            move.assert_called_once()
+            camera.assert_called_once_with(self.session, self.game, 'DP-1')
+            self.assertEqual(result['movement']['status'], 'arrived')
+
+    def test_recenter_skipped_on_stop(self):
+        for status, stopped in [('stopped', False), ('arrived', True)]:
+            self.session.stop.clear()
+            if stopped: self.session.stop.set()
+            with patch('rts_controller.paused_move.move', return_value={'status':status}), \
+                 patch('rts_controller.camera.center') as camera:
+                result = move_and_center(self.session, self.game, '81', (100, 200), 'DP-1')
+                camera.assert_not_called()
+                self.assertEqual(result['camera']['status'], 'skipped')
+
+    def test_recenter_never_runs_after_failed_move(self):
+        with patch('rts_controller.paused_move.move', side_effect=BridgeError('no arrival')), \
+             patch('rts_controller.camera.center') as camera:
+            with self.assertRaises(BridgeError):
+                move_and_center(self.session, self.game, '81', (100, 200), 'DP-1')
+            camera.assert_not_called()

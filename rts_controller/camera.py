@@ -49,4 +49,14 @@ def center(session, game, output, *, key_sender=send_key):
     after = session.advance(1, guard=lambda: game.fits_output(output))
     return {"status": "camera_key_sent", "frame": after["frame"],
             "actors": [u["id"] for u in selected],
-            "verification": "Inspect full-screen capture; acknowledgment is not camera proof"}
+            "verification": "Inspect full-screen capture; acknowledgment is not camera proof",
+            "boundary_note": "An unchanged view can be correct at a map boundary; test from a displaced view"}
+
+
+def move_and_center(session, game, actor, destination, output, *, report=lambda event: None):
+    """Recenter only after verified arrival; retain stop and failure boundaries."""
+    from .paused_move import move
+    result = move(session, game, actor, destination, report=report)
+    if result["status"] != "arrived" or session.stop.is_set():
+        return {"movement": result, "camera": {"status": "skipped"}}
+    return {"movement": result, "camera": center(session, game, output)}
