@@ -10,13 +10,15 @@ class Orders:
             raise ValueError("Invalid port or timeout")
         self.port, self.timeout, self.socket = port, timeout, None
 
-    def request(self, name, fields):
+    def request(self, name, fields, *, on_queued=None, on_uncertain=None):
         if name not in {"UnitCommand", "MissionClicked"}:
             raise BridgeError("Unsupported game order")
         try:
             import websocket
         except ImportError as error:
             raise BridgeError("Install the ra2 extra for live orders: pip install '.[ra2]'") from error
+        submitted = False
+        completed = False
         try:
             if self.socket is None:
                 self.socket = websocket.create_connection(
@@ -38,12 +40,16 @@ class Orders:
                     raise BridgeError("Order transport error")
                 return response
 
+            submitted = True
             ack = exchange({"commandType": "CLIENT_COMMAND", "blocking": False,
                             "command": {"@type": PREFIX + "ra2yrproto.commands." + name, **fields}})
             body = ack["body"]
             if body["@type"] != PREFIX + "ra2yrproto.RunCommandAck" or not body.get("id"):
                 raise BridgeError("Missing order acknowledgment")
             command_id = str(body["id"])
+            if on_queued is not None:
+                on_queued()
+                deadline = time.monotonic() + self.timeout
             while True:
                 response = exchange({"commandType": "POLL"})
                 body = response["body"]
@@ -53,13 +59,20 @@ class Orders:
                 if results:
                     if len(results) != 1 or str(results[0].get("commandId")) != command_id:
                         raise BridgeError("Order result correlation failed")
-                    return unpack(response, name)
+                    payload = unpack(response, name)
+                    completed = True
+                    return payload
                 if time.monotonic() >= deadline:
                     raise BridgeError("Order result timed out; outcome uncertain, not retried")
                 time.sleep(min(.005, max(0, deadline-time.monotonic())))
         except (OSError, websocket.WebSocketException, ValueError, KeyError, TypeError, AttributeError) as error:
             raise BridgeError(f"Order transport failed; outcome uncertain, not retried: {error}") from error
         finally:
+            # A pending callback may still belong to the engine. The paused
+            # lab controller terminates its verified test process before
+            # disconnecting on uncertainty, rather than retrying a command.
+            if submitted and not completed and on_uncertain is not None:
+                on_uncertain()
             # A fresh connection per order keeps result queues isolated, but
             # remains open for acknowledgment and every completion poll.
             self.close()

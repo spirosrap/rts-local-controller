@@ -1,5 +1,9 @@
 # Red Alert 2 bridge investigation
 
+**Update:** a newer [pause-assisted mode](pause-assisted.md) has now completed live
+selection/movement tests. The free-running experiments below are historical and
+remain unverified. Use the pause-assisted guide for the next test.
+
 ## Interface
 
 The candidate bridge is [shmocz/ra2yrcpp](https://github.com/shmocz/ra2yrcpp),
@@ -87,7 +91,7 @@ Compatibility with the installed Ares/Phobos/spawner combination must be tested;
 successful protocol tests against a synthetic HTTP server do not establish live
 game compatibility.
 
-## Local validation (2026-09-12)
+## Earlier free-running validation (2026-09-12)
 
 - 24 automated tests passed, covering synthetic HTTP, mocked WebSocket polling,
   correlation/errors, no command resubmission, explicit arming, owned-unit bounds,

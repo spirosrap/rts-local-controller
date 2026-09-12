@@ -3,13 +3,14 @@
 An experimental local controller for observable, verified RTS actions, initially
 motivated by playing Red Alert 2 on Linux/Wayland.
 
-**Status: live state reading verified; live movement still experimental.**
-The reader obtained owned-unit positions, health, selection, and mission state
-from an isolated Red Alert 2 game copy. Short samples took 14–30 ms per observation
-on the test machine; this is not an end-to-end action benchmark. An explicitly
-armed selection/movement adapter is implemented, but a live move has NOT been
-verified: the instrumented game encountered a fatal error during testing.
-This is not yet a working bot or human-speed player. The demo never controls your computer.
+**Status: pause-assisted selection and short movement verified in a live test.**
+The controller reads state without advancing simulation, releases bounded game
+frames, verifies movement, and leaves the game paused. Four short moves completed
+in the first test session; an unsuccessful route stopped at its frame limit.
+Full 2560×1440 monitor capture was checked against unchanged simulation frames.
+This remains an experimental offline controller, not a campaign-playing bot or
+human-speed player. Earlier free-running tests crashed; their root cause is not
+proven fixed. The demo never controls your computer.
 
 ## Why
 
@@ -37,8 +38,10 @@ Read an already running, network-isolated game bridge:
 python -m rts_controller.cli observe-ra2 --samples 10
 ```
 
-The experimental live-order extra uses `websocket-client`. See
-[bridge setup, restrictions, and test status](docs/ra2-bridge.md) before enabling it.
+The experimental live-order extra uses `websocket-client`. Start with the
+[pause-assisted test guide](docs/pause-assisted.md). The older free-running path
+is not the recommended test mode. See also
+[bridge setup, restrictions, and historical test status](docs/ra2-bridge.md).
 Do not expose the third-party bridge to a network or use it in online matches.
 
 On a Wayland desktop supporting `grim`:
@@ -75,10 +78,9 @@ of the current capture backend.
 
 ## Next milestones
 
-1. Resolve bridge/runtime instability and provide verified network isolation.
-2. Verify a short selection/move cycle in the live game, including arrival,
-   with full-screen evidence and end-to-end latency measurements.
-3. Add a physical emergency-stop binding and a live full-monitor viewer.
+1. Test repeated fresh launches and longer sessions; investigate the earlier crash.
+2. Improve camera following, path failure reporting, and tick throughput.
+3. Add a user-facing control panel and portable physical emergency-stop bindings.
 4. Establish trustworthy enemy visibility, lifetime IDs, and destruction events
    before enabling attacks. Test camera movement and fog transitions.
 5. Add target reacquisition, path failure recovery, and multi-unit behaviors.

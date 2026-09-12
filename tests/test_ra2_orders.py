@@ -48,3 +48,19 @@ class OrdersTests(unittest.TestCase):
 
     def test_unknown_order_denied(self):
         with self.assertRaises(BridgeError): Orders().request("Unknown", {})
+
+    def test_queued_callback_runs_before_poll(self):
+        socket, module = self.transport([self.ack(), self.result()])
+        def queued(): self.assertEqual(socket.send_binary.call_count, 1)
+        recover = Mock()
+        with patch.dict("sys.modules", websocket=module):
+            Orders().request("UnitCommand", {}, on_queued=queued, on_uncertain=recover)
+        recover.assert_not_called()
+
+    def test_uncertainty_recovers_before_disconnect(self):
+        socket, module = self.transport([])
+        socket.recv.side_effect = TimeoutError("timed out")
+        def recover(): socket.close.assert_not_called()
+        with patch.dict("sys.modules", websocket=module):
+            with self.assertRaises(BridgeError): Orders().request("UnitCommand", {}, on_uncertain=recover)
+        socket.close.assert_called_once()

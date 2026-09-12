@@ -79,6 +79,11 @@ class Reader:
             raise BridgeError("Single-step mode would advance the game; observation refused")
         payload = self._read("GetGameState")
         state = payload.get("state")
+        return self.summarize(state, start)
+
+    def summarize(self, state, start=None):
+        if start is None:
+            start = time.monotonic()
         if not isinstance(state, dict) or state.get("stage") not in ("STAGE_INGAME", 2):
             raise BridgeError("No active in-game observation")
         frame = state.get("currentFrame", 0)
