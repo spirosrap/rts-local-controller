@@ -43,6 +43,8 @@ def main():
     paused.add_argument("--arm", action="store_true")
     action = paused.add_mutually_exclusive_group()
     action.add_argument("--frames", type=int)
+    action.add_argument("--center", action="store_true", help="Center view on selected owned objects")
+    action.add_argument("--stop-actor", action="store_true", help="Stop and verify an owned unit")
     action.add_argument("--move", nargs=2, type=int, metavar=("WORLD_X", "WORLD_Y"))
     paused.add_argument("--actor")
     observe = commands.add_parser("observe-ra2", help="Read local ra2yrcpp; never send game orders")
@@ -81,14 +83,24 @@ def main():
             game = TestGame(args.game_pid, args.game_dir)
             session = PausedSession(args.port, armed=args.arm, stop=stop)
             if not game.fits_output(args.output): raise BridgeError("Test game must fill the chosen monitor and be focused")
-            if args.move is not None:
+            before = session.stable()
+            if args.center:
+                from .camera import center
+                print(json.dumps(center(session, game, args.output)), flush=True)
+            elif args.stop_actor:
+                from .paused_stop import stop_actor
+                print(json.dumps(stop_actor(session, game, args.actor)), flush=True)
+            elif args.move is not None:
                 if args.actor is None: raise ValueError("Movement requires --actor")
                 print(json.dumps(move(session, game, args.actor, tuple(args.move),
                       report=lambda e: print(json.dumps(e), flush=True))), flush=True)
             elif args.frames is not None:
                 session.advance(args.frames, guard=game.focused)
             if not game.focused(): raise BridgeError("Focus changed before capture")
-            print(json.dumps(session.capture(args.output, args.image)), flush=True)
+            result = session.capture(args.output, args.image)
+            from .progress import changes
+            result["progress"] = changes(before, result["state"])
+            print(json.dumps(result), flush=True)
             if not game.fits_output(args.output): raise BridgeError("Window mapping changed during capture")
             if stop.is_set(): parser.exit(130, "Stopped. No further simulation frames will be released.\n")
         except (BridgeError, ValueError, OSError) as error:

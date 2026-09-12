@@ -102,13 +102,23 @@ class Reader:
         # Enemy visibility is not exposed by this protocol. Do not claim that
         # onMap means visible, or expose hidden enemies as actionable targets.
         own = [o for o in state.get("objects", []) if o.get("pointerHouse") == player["self"]]
+        types = {o.get("pointerSelf"): o for o in state.get("objectTypes", [])}
         units = [{"id": str(o.get("pointerSelf")), "health": o.get("health", 0),
                   "coordinates": o.get("coordinates"), "selected": o.get("selected", False),
                   "on_map": o.get("onMap", False), "in_limbo": o.get("inLimbo", False),
-                  "type_id": str(o.get("pointerTechnotypeclass"))} for o in own]
+                  "type_id": str(o.get("pointerTechnotypeclass")),
+                  "type_name": types.get(o.get("pointerTechnotypeclass"), {}).get("name"),
+                  "kind": o.get("objectType"),
+                  "mission": o.get("currentMission"),
+                  "destination": o.get("destination"),
+                  "deployed": o.get("deployed", False)} for o in own]
         return {"frame": frame, "observed_at": self.frame_seen_at,
                 "frame_unchanged_ms": round((now-self.frame_seen_at)*1000, 2),
                 "request_ms": round((now-start)*1000, 2), "own_objects": units,
+                "economy": {"credits": player.get("money"),
+                            "power_output": player.get("powerOutput"),
+                            "power_drain": player.get("powerDrain")},
+                "production": player.get("buildState", []),
                 "winner": player.get("isWinner", False), "loser": player.get("isLoser", False),
                 "single_human": player.get("isHumanPlayer") is True and
                     sum(h.get("isHumanPlayer") is True for h in state.get("houses", [])) == 1,

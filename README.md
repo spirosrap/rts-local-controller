@@ -12,6 +12,12 @@ This remains an experimental offline controller, not a campaign-playing bot or
 human-speed player. Earlier free-running tests crashed; their root cause is not
 proven fixed. The demo never controls your computer.
 
+The next increment adds live-verified unit stopping, owned-object names and kinds,
+current orders/destinations, economy/production observations, and before/after
+progress reports. 63 automated tests pass. Camera centering is still experimental
+and **not yet verified**; ordinary pointer interaction while paused remains a
+limitation. Combat, production execution, and general mission planning are pending.
+
 ## Why
 
 A screenshot → language-model decision → tool invocation loop is too slow for

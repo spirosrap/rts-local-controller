@@ -21,16 +21,18 @@ class PausedSession:
         self.stop = stop if stop is not None else threading.Event()
         self.failed = False
         self.last_frame = None
+        self.object_types = None
 
     def request(self, name, fields=None):
-        allowed = {"InspectConfiguration": {}, "ReadValue": {"data": {"gameState": {}}},
-                   "GetGameState": {}}
-        if name not in allowed or (fields or {}) != allowed[name]:
+        allowed = {"InspectConfiguration": [{}],
+                   "ReadValue": [{"data": {"gameState": {}}}, {"data": {"initialGameState": {}}}],
+                   "GetGameState": [{}]}
+        if name not in allowed or (fields or {}) not in allowed[name]:
             raise BridgeError("Unsupported paused-session request")
         c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=.7)
         try:
             c.request("POST", "/", json.dumps({"commandType": "CLIENT_COMMAND", "blocking": True,
-                      "command": {"@type": PREFIX+"ra2yrproto.commands."+name, **allowed[name]}}),
+                      "command": {"@type": PREFIX+"ra2yrproto.commands."+name, **(fields or {})}}),
                       {"Content-Type": "application/json"})
             r = c.getresponse()
             if r.status != 200: raise BridgeError("Bridge HTTP error")
@@ -51,6 +53,11 @@ class PausedSession:
             self.failed = True
             raise BridgeError("singleStep must already be enabled in the test copy")
         state = self.request("ReadValue", {"data": {"gameState": {}}}).get("data", {}).get("gameState")
+        if self.object_types is None:
+            initial = self.request("ReadValue", {"data": {"initialGameState": {}}})
+            self.object_types = initial.get("data", {}).get("initialGameState", {}).get("objectTypes", [])
+        if isinstance(state, dict) and not state.get("objectTypes"):
+            state["objectTypes"] = self.object_types
         snapshot = self.reader.summarize(state, start)
         if self.last_frame is not None and snapshot["frame"] < self.last_frame:
             self.failed = True

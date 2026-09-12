@@ -40,6 +40,13 @@ class PausedTests(unittest.TestCase):
         self.assertEqual(s.stable()["frame"], 10)
         self.assertNotIn("GetGameState", s.calls)
 
+    def test_initial_types_read_only_once(self):
+        s = FakeSession()
+        s.observe(); first = s.calls.count("ReadValue")
+        s.observe()
+        self.assertEqual(first, 2)
+        self.assertEqual(s.calls.count("ReadValue"), 3)
+
     def test_exact_steps_and_pause(self):
         s = FakeSession()
         self.assertEqual(s.advance(5)["frame"], 15)

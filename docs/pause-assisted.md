@@ -26,6 +26,51 @@ Ordinary manual UI interaction is not supported while the simulation gate is
 closed. Music/video playback can have a separate clock. Camera following is not
 implemented; a scripted camera can leave a selected unit outside the view.
 
+### Additional controls and observation
+
+`--actor ACTOR_ID --stop-actor` issues a stop and verifies three consecutive
+unchanged positions with a Stop/Guard mission. The total budget is 120 frames;
+units can finish their current cell movement before stopping. A timeout is not
+reported as success. This was live-verified at frame 1138 and the position stayed
+unchanged through frame 1258.
+
+Observations now include owned-unit type names (from the initial type table),
+infantry/building/etc. categories, current orders, destinations, deployment state,
+credits, power, and production information where supplied by the bridge. Missing
+information remains null. Every successful CLI operation also reports before/after
+changes. An owned object disappearing is **not** called destruction; its cause is
+unknown. No Tanya-specific actor lookup is used.
+
+`--center` is an **experimental camera diagnostic**, not a verified camera fix.
+It reads CenterView from the test copy's KeyboardMD.ini and rejects unsupported or
+conflicting bindings. The configured keypad binding is 12; the proposed isolated
+test binding is J (74). It sends through Hyprland, releases the key even on step
+failure, and leaves simulation paused. Inspect the complete capture afterward:
+`camera_key_sent` means delivery was acknowledged, not that the camera centered.
+Do not substitute F: the game's own command descriptions define Follow as making
+selected objects follow another object, not camera following.
+
+The camera investigation also found that constructing a Hyprland dispatcher is
+not executing it: runtime focus needs `hl.dispatch(hl.dsp.focus(...))` through
+`hyprctl eval`. This is a runtime action, not a compositor configuration change.
+
+Text-oriented virtual keyboards can assign temporary physical codes. The tested
+`wtype` keypad attempt opened the Options menu and caused the frame guard to stop;
+the menu was closed and the session recovered without restarting. Do not use that
+method for game camera control. See [wtype source](https://github.com/atx/wtype/blob/master/main.c).
+
+### Remaining implementation milestones
+
+1. Verify camera centering and visible pointer behavior in a fresh isolated run;
+   add automatic recentering only after positive live evidence.
+2. Generalize selection to multiple owned actors and add verified deployment.
+3. Add player-visible target evidence and combat outcomes; do not expose hidden
+   enemies as actionable or treat disappearance as a kill.
+4. Add production/placement commands and verify queue, resource, and object changes
+   in a mission with a base. Current production support is observation only.
+5. Add an objective/task planner and test several missions with different unit
+   sets. Neither a mission-specific script nor passing unit tests proves general play.
+
 ## Preparing and launching
 
 Obtain the external bridge described in [the investigation](ra2-bridge.md).
