@@ -53,6 +53,49 @@ class PausedTests(unittest.TestCase):
         self.assertEqual(s.calls.count("GetGameState"), 5)
         self.assertEqual(s.stable()["frame"], 15)
 
+    def test_combat_damage_stops_exact_frame_and_allows_observation(self):
+        s = FakeSession()
+        original = s.observe
+        def observe():
+            state = original()
+            if s.frame >= 13: state["own_objects"][0]["health"] = 124
+            return state
+        s.observe = observe
+        result = s.combat(15, ["100"])
+        self.assertEqual(result["status"], "interrupted")
+        self.assertEqual(result["advanced_frames"], 3)
+        self.assertEqual(s.calls.count("GetGameState"), 3)
+        self.assertFalse(s.failed)
+        self.assertEqual(s.stable()["frame"], 13)
+        with self.assertRaises(BridgeError): s.advance(1)
+        self.assertEqual(s.calls.count("GetGameState"), 3)
+
+    def test_combat_budget_and_watch_validation(self):
+        for frames in (0, 16, True):
+            with self.assertRaises(ValueError): FakeSession().combat(frames, ["100"])
+        with self.assertRaises(ValueError): FakeSession().combat(1, [])
+        s = FakeSession()
+        with self.assertRaises(BridgeError): s.combat(1, ["200"])
+        self.assertNotIn("GetGameState", s.calls)
+
+    def test_combat_healthy_budget(self):
+        s = FakeSession()
+        result = s.combat(15, ["100"])
+        self.assertEqual(result["status"], "budget_complete")
+        self.assertEqual(result["advanced_frames"], 15)
+
+    def test_combat_missing_actor_interrupts(self):
+        s = FakeSession()
+        original = s.observe
+        def observe():
+            state = original()
+            if s.frame > 10: state["own_objects"] = []
+            return state
+        s.observe = observe
+        result = s.combat(15, ["100"])
+        self.assertEqual(result["advanced_frames"], 1)
+        self.assertEqual(result["interruption"]["events"][0]["reason"], "identity_lost")
+
     def test_stop_prevents_release(self):
         s = FakeSession(); s.stop.set()
         self.assertEqual(s.advance(5)["frame"], 10)

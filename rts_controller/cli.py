@@ -43,6 +43,8 @@ def main():
     paused.add_argument("--arm", action="store_true")
     action = paused.add_mutually_exclusive_group()
     action.add_argument("--frames", type=int)
+    action.add_argument("--combat-frames", type=int, help="1..15 frames with per-frame damage checks")
+    paused.add_argument("--watch-actor", action="append", default=[], help="Owned actor to protect; repeat for support units")
     action.add_argument("--center", action="store_true", help="Center view on selected owned objects")
     action.add_argument("--stop-actor", action="store_true", help="Stop and verify an owned unit")
     action.add_argument("--move", nargs=2, type=int, metavar=("WORLD_X", "WORLD_Y"))
@@ -104,6 +106,12 @@ def main():
                 print(json.dumps(outcome), flush=True)
             elif args.frames is not None:
                 session.advance(args.frames, guard=game.focused)
+            elif args.combat_frames is not None:
+                outcome = session.combat(args.combat_frames, args.watch_actor, guard=game.focused)
+                if outcome["interruption"]:
+                    args.stop_file.parent.mkdir(parents=True, exist_ok=True)
+                    args.stop_file.touch()
+                print(json.dumps(outcome), flush=True)
             if not game.focused(): raise BridgeError("Focus changed before capture")
             result = session.capture(args.output, args.image)
             from .progress import changes

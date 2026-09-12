@@ -86,6 +86,24 @@ method for game camera control. See [wtype source](https://github.com/atx/wtype/
 
 ## Preparing and launching
 
+### Combat checkpoints
+
+Use `--combat-frames 15 --watch-actor ACTOR_ID` instead of `--frames` in
+combat. Repeat `--watch-actor` for every critical unit and infantry escort.
+This checks health after each single frame and interrupts on the first damage,
+missing actor, identity change, unavailable actor state, or mission outcome.
+The maximum combat burst is 15 frames. The full-monitor capture still occurs
+at the paused frame. Damage sets the existing STOP file and exits stopped;
+review the captured state before deliberately using `clear-stop` and issuing
+a new order. Observation remains possible with STOP set.
+
+This is not automatic retreat or invulnerability: lethal damage can happen in
+one frame. It does not add damage protection to `--frames`, `--move`, or camera
+commands. Do not use those commands to wait through combat. Escort selection,
+positioning, and target choice still require verified observations; the controller
+does not yet plan a coordinated infantry assault. An empty production summary
+is not evidence that construction queues are idle; confirm using the game UI.
+
 Obtain the external bridge described in [the investigation](ra2-bridge.md).
 Keep it and all game assets outside this repository. The launcher expects the
 tested Ares/CnCNet-Spawner/Phobos/Syringe combination and `gamemd-spawn.exe`.

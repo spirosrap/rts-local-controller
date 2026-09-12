@@ -22,6 +22,7 @@ class PausedSession:
         self.failed = False
         self.last_frame = None
         self.object_types = None
+        self.interruption = None
 
     def request(self, name, fields=None):
         allowed = {"InspectConfiguration": [{}],
@@ -77,6 +78,8 @@ class PausedSession:
         return second
 
     def advance(self, frames=1, *, guard=lambda: True):
+        if self.interruption is not None:
+            raise BridgeError("Combat interrupted; review the paused state before a new session")
         if type(frames) is not int or not 1 <= frames <= 120:
             raise ValueError("Step budget must be 1..120 frames")
         state = self.stable()
@@ -104,6 +107,51 @@ class PausedSession:
                 self.failed = True
                 raise
         return self.stable()
+
+    def combat(self, frames, actors, *, guard=lambda: True):
+        """Release at most 15 frames, stopping on the first watched-unit change.
+
+        An interruption is a known paused outcome, not a transport failure.
+        Observation/capture remain available; further releases are latched off.
+        """
+        if type(frames) is not int or not 1 <= frames <= 15:
+            raise ValueError("Combat budget must be 1..15 frames")
+        actors = set(actors)
+        if not actors:
+            raise ValueError("Combat requires explicitly watched owned actors")
+        state = self.stable()
+        previous = {u["id"]: u for u in state["own_objects"] if u["id"] in actors}
+        if set(previous) != actors or any(
+            type(u.get("health")) is not int or u["health"] <= 0
+            or not u.get("on_map") or u.get("in_limbo") for u in previous.values()
+        ):
+            raise BridgeError("Watched actors must be alive, owned and on map")
+        start = state["frame"]
+        for _ in range(frames):
+            if self.stop.is_set(): break
+            state = self.advance(1, guard=guard)
+            current = {u["id"]: u for u in state["own_objects"]}
+            events = []
+            for actor, old in previous.items():
+                new = current.get(actor)
+                if new is None or new.get("type_id") != old.get("type_id"):
+                    events.append({"actor": actor, "reason": "identity_lost"})
+                elif (type(new.get("health")) is not int or not new.get("on_map")
+                      or new.get("in_limbo")):
+                    events.append({"actor": actor, "reason": "state_unavailable"})
+                elif new["health"] < old["health"]:
+                    events.append({"actor": actor, "reason": "damage",
+                                   "before": old["health"], "after": new["health"]})
+            if state["winner"] or state["loser"]:
+                events.append({"reason": "mission_ended"})
+            if events:
+                self.interruption = {"frame": state["frame"], "events": events}
+                break
+            previous = {actor: current[actor] for actor in actors}
+        return {"status": "interrupted" if self.interruption else
+                "stopped" if self.stop.is_set() else "budget_complete",
+                "advanced_frames": state["frame"] - start,
+                "interruption": self.interruption}
 
     def capture(self, output, destination):
         before = self.stable()
