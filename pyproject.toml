@@ -8,6 +8,9 @@ version = "0.1.0"
 description = "Local, observable RTS control loop with verified actions"
 requires-python = ">=3.11"
 
+[project.optional-dependencies]
+ra2 = ["websocket-client>=1.8,<2"]
+
 [project.scripts]
 rts-controller = "rts_controller.cli:main"
 

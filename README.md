@@ -3,9 +3,13 @@
 An experimental local controller for observable, verified RTS actions, initially
 motivated by playing Red Alert 2 on Linux/Wayland.
 
-**Status: tested foundation, not yet a working Red Alert 2 bot.** There is no live
-game-state reader, unit detector, or OS input adapter in this release. It does
-not claim human-speed play. The simulation never controls your computer.
+**Status: live state reading verified; live movement still experimental.**
+The reader obtained owned-unit positions, health, selection, and mission state
+from an isolated Red Alert 2 game copy. Short samples took 14–30 ms per observation
+on the test machine; this is not an end-to-end action benchmark. An explicitly
+armed selection/movement adapter is implemented, but a live move has NOT been
+verified: the instrumented game encountered a fatal error during testing.
+This is not yet a working bot or human-speed player. The demo never controls your computer.
 
 ## Why
 
@@ -16,7 +20,7 @@ and stopping into a local loop. A higher-level planner can supply objectives.
 The complete monitor is captured at native resolution, without cropping or
 resizing. Viewing frames and reading game state are separate concerns. A future
 state adapter may use local full-frame vision or a documented game integration;
-neither has been implemented yet.
+the candidate API and its limits are documented in [the bridge investigation](docs/ra2-bridge.md).
 
 ## Run
 
@@ -26,6 +30,16 @@ Python 3.11+; the core and tests use the standard library only.
 python -m rts_controller.cli demo
 python -m unittest discover -s tests -v
 ```
+
+Read an already running, network-isolated game bridge:
+
+```sh
+python -m rts_controller.cli observe-ra2 --samples 10
+```
+
+The experimental live-order extra uses `websocket-client`. See
+[bridge setup, restrictions, and test status](docs/ra2-bridge.md) before enabling it.
+Do not expose the third-party bridge to a network or use it in online matches.
 
 On a Wayland desktop supporting `grim`:
 
@@ -61,13 +75,12 @@ of the current capture backend.
 
 ## Next milestones
 
-1. Investigate an RA2/CnCNet game-state interface and its redistribution terms.
-2. Implement a read-only adapter; compare its positions, selection, and events
-   against full-screen recordings across camera movement and fog transitions.
-3. Add bounded input, focus validation, runtime monitor mapping, and a physical
-   emergency-stop binding. Avoid fixed desktop coordinates.
-4. Test single-unit selection and movement, then one ship attack, with local
-   action/observation logs and measured end-to-end latency.
+1. Resolve bridge/runtime instability and provide verified network isolation.
+2. Verify a short selection/move cycle in the live game, including arrival,
+   with full-screen evidence and end-to-end latency measurements.
+3. Add a physical emergency-stop binding and a live full-monitor viewer.
+4. Establish trustworthy enemy visibility, lifetime IDs, and destruction events
+   before enabling attacks. Test camera movement and fog transitions.
 5. Add target reacquisition, path failure recovery, and multi-unit behaviors.
 
 No game binaries, maps, sprites, screenshots, credentials, or proprietary source
